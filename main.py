@@ -137,5 +137,67 @@ async def оновити_embed(повідомлення, дані):
 
     await повідомлення.edit(embed=новий)
 
+@bot.command(name="твін")
+async def твін(ctx):
+    повідомлення = await ctx.send("🔹 **Оберіть одного з Твінів:**")
+
+    emoji_map = {
+        "1️⃣": "Твін 1",
+        "2️⃣": "Твін 2",
+        "3️⃣": "Твін 3",
+        "4️⃣": "Твін 4",
+        "5️⃣": "Твін 5",
+        "6️⃣": "Твін 6",
+        "7️⃣": "Твін 7",
+        "8️⃣": "Твін 8",
+        "9️⃣": "Твін 9",
+        "❌": "remove",
+        "🔁": "refresh"
+    }
+
+    твіни = {k: [] for k in emoji_map if k not in ["❌", "🔁"]}
+    twin_data = {"message": повідомлення, "users": твіни}
+
+    for emoji in emoji_map:
+        await повідомлення.add_reaction(emoji)
+
+    @bot.event
+    async def on_reaction_add(reaction, user):
+        if user.bot or reaction.message.id != повідомлення.id:
+            return
+
+        emoji = str(reaction.emoji)
+
+        if emoji not in emoji_map:
+            return
+
+        # Remove user from all twin selections
+        for емоджі in твіни:
+            if user.mention in твіни[емоджі]:
+                твіни[емоджі].remove(user.mention)
+
+        if emoji == "❌":
+            await оновити_твіни()
+            return
+        elif emoji == "🔁":
+            await оновити_твіни()
+            return
+        else:
+            твіни[emoji].append(user.mention)
+
+        try:
+            await reaction.message.remove_reaction(emoji, user)
+        except:
+            pass
+
+        await оновити_твіни()
+
+    async def оновити_твіни():
+        embed = discord.Embed(title="📌 Вибір Твіна", color=0x3498db)
+        for emoji in твіни:
+            список = "\n".join(твіні[emoji]) if твіни[emoji] else "—"
+            embed.add_field(name=f"{emoji} {emoji_map[emoji]} ({len(твіни[emoji])})", value=список, inline=True)
+        await повідомлення.edit(content=None, embed=embed)
+
 keep_alive()
 bot.run(os.getenv("TOKEN"))
