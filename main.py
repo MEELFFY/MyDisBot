@@ -148,11 +148,12 @@ async def твін(ctx):
     дані = {твін: [] for твін in твіни}
 
     embed = discord.Embed(title="🌀 Обери свого Твіна", color=0x0099ff)
-
+    опис = ""
     for твін in твіни:
-        учасники = " " + ", ".join(дані[твін]) if дані[твін] else ""
-        embed.add_field(name=твін, value=учасники or "‎", inline=False)
+        учасники = " – " + ", ".join(дані[твін]) if дані[твін] else ""
+        опис += f"{твін}{учасники}\n"
 
+    embed.description = опис
     повідомлення = await ctx.send(embed=embed)
 
     twin_data = {
@@ -167,6 +168,7 @@ async def твін(ctx):
     for emoji in emojis + ['❌', '🔁']:
         await повідомлення.add_reaction(emoji)
 
+
 @bot.event
 async def on_reaction_add(reaction, user):
     if user.bot:
@@ -179,7 +181,6 @@ async def on_reaction_add(reaction, user):
     twin_data = bot.twin_messages[message_id]
     emoji = str(reaction.emoji)
 
-    # Скидання виборів
     if emoji == '🔁':
         for ключ in twin_data["дані"]:
             twin_data["дані"][ключ] = []
@@ -188,21 +189,21 @@ async def on_reaction_add(reaction, user):
             if user.mention in twin_data["дані"][ключ]:
                 twin_data["дані"][ключ].remove(user.mention)
     elif emoji in twin_data["emoji_map"]:
-        # Видаляємо з усіх
+        # Видаляємо учасника з усіх Твінів перед новим вибором
         for ключ in twin_data["дані"]:
             if user.mention in twin_data["дані"][ключ]:
                 twin_data["дані"][ключ].remove(user.mention)
-        # Додаємо до вибраного
-        twin_name = twin_data["emoji_map"][emoji]
-        if user.mention not in twin_data["дані"][twin_name]:
-            twin_data["дані"][twin_name].append(user.mention)
+        # Додаємо до нового Твіна
+        твін = twin_data["emoji_map"][emoji]
+        twin_data["дані"][твін].append(user.mention)
 
-    # Оновлення embed
+    # Оновлення Embed
     новий_embed = discord.Embed(title="🌀 Обери свого Твіна", color=0x0099ff)
+    опис = ""
     for твін in twin_data["дані"]:
-        учасники = " " + ", ".join(twin_data["дані"][твін]) if twin_data["дані"][твін] else "‎"
-        новий_embed.add_field(name=твін, value=учасники, inline=False)
-
+        учасники = " – " + ", ".join(twin_data["дані"][твін]) if twin_data["дані"][твін] else ""
+        опис += f"{твін}{учасники}\n"
+    новий_embed.description = опис
     await reaction.message.edit(embed=новий_embed)
 
     try:
