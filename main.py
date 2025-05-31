@@ -137,11 +137,11 @@ async def оновити_embed(повідомлення, дані):
 
     await повідомлення.edit(embed=новий)
 
-@bot.command(name="твін")
-async def твін(ctx):
-    повідомлення = await ctx.send("🔹 **Оберіть одного з Твінів:**")
+@bot.command(name="твіни")
+async def твіни(ctx):
+    await ctx.message.delete()
 
-    emoji_map = {
+    твіни = {
         "1️⃣": "Твін 1",
         "2️⃣": "Твін 2",
         "3️⃣": "Твін 3",
@@ -150,54 +150,83 @@ async def твін(ctx):
         "6️⃣": "Твін 6",
         "7️⃣": "Твін 7",
         "8️⃣": "Твін 8",
-        "9️⃣": "Твін 9",
-        "❌": "remove",
-        "🔁": "refresh"
+        "9️⃣": "Твін 9"
     }
 
-    твіни = {k: [] for k in emoji_map if k not in ["❌", "🔁"]}
-    twin_data = {"message": повідомлення, "users": твіни}
+    вибори = {key: [] for key in твіни}
+    додаткові = ["❌", "🔁"]
 
-    for emoji in emoji_map:
-        await повідомлення.add_reaction(emoji)
+    embed = discord.Embed(
+        title="🧬 Обери свого Твіна",
+        color=0x3498db
+    )
 
-    @bot.event
-    async def on_reaction_add(reaction, user):
-        if user.bot or reaction.message.id != повідомлення.id:
-            return
+    for emoji, name in твіни.items():
+        embed.add_field(name=f"{emoji} {name}", value="Ніхто", inline=False)
 
-        emoji = str(reaction.emoji)
+    msg = await ctx.send(embed=embed)
 
-        if emoji not in emoji_map:
-            return
+    twin_data = {
+        "message": msg,
+        "твіни": твіни,
+        "вибори": вибори
+    }
 
-        # Remove user from all twin selections
-        for емоджі in твіни:
-            if user.mention in твіни[емоджі]:
-                твіни[емоджі].remove(user.mention)
+    bot.twin_data = bot.twin_data if hasattr(bot, "twin_data") else {}
+    bot.twin_data[msg.id] = twin_data
 
-        if emoji == "❌":
-            await оновити_твіни()
-            return
-        elif emoji == "🔁":
-            await оновити_твіни()
-            return
-        else:
-            твіни[emoji].append(user.mention)
+    for emoji in list(твіни.keys()) + додаткові:
+        await msg.add_reaction(emoji)
 
-        try:
-            await reaction.message.remove_reaction(emoji, user)
-        except:
-            pass
+@bot.event
+async def on_reaction_add(reaction, user):
+    if user.bot:
+        return
 
-        await оновити_твіни()
+    msg_id = reaction.message.id
+    emoji = str(reaction.emoji)
 
-    async def оновити_твіни():
-        embed = discord.Embed(title="📌 Вибір Твіна", color=0x3498db)
-        for emoji in твіни:
-            список = "\n".join(твіні[emoji]) if твіни[emoji] else "—"
-            embed.add_field(name=f"{emoji} {emoji_map[emoji]} ({len(твіни[emoji])})", value=список, inline=True)
-        await повідомлення.edit(content=None, embed=embed)
+    if not hasattr(bot, "twin_data") or msg_id not in bot.twin_data:
+        return
+
+    data = bot.twin_data[msg_id]
+    твіни = data["твіни"]
+    вибори = data["вибори"]
+
+    if emoji == "❌":
+        for список in вибори.values():
+            if user.mention in список:
+                список.remove(user.mention)
+        await оновити_твіни(reaction.message, data)
+        await reaction.message.remove_reaction(emoji, user)
+        return
+
+    if emoji == "🔁":
+        await оновити_твіни(reaction.message, data)
+        await reaction.message.remove_reaction(emoji, user)
+        return
+
+    if emoji in твіни:
+        for список in вибори.values():
+            if user.mention in список:
+                список.remove(user.mention)
+
+        вибори[emoji].append(user.mention)
+        await оновити_твіни(reaction.message, data)
+        await reaction.message.remove_reaction(emoji, user)
+
+async def оновити_твіни(msg, data):
+    embed = discord.Embed(
+        title="🧬 Обери свого Твіна",
+        color=0x3498db
+    )
+
+    for emoji, name in data["твіни"].items():
+        учасники = data["вибори"][emoji]
+        текст = "\n".join(учасники) if учасники else "Ніхто"
+        embed.add_field(name=f"{emoji} {name}", value=текст, inline=False)
+
+    await msg.edit(embed=embed)
 
 keep_alive()
 bot.run(os.getenv("TOKEN"))
