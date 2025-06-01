@@ -24,22 +24,15 @@ async def on_ready():
 async def активність(ctx, *, args):
     try:
         await ctx.message.delete()
-
         частини = args.split("|")
         if len(частини) < 2:
             await ctx.send("❌ Формат:\n`!активність Назва | Опис | Дата`\nабо\n`!активність Назва | Дата`", delete_after=10)
             return
 
         назва = частини[0].strip()
-
-        if len(частини) == 2:
-            опис = ""
-            дата_час = частини[1].strip()
-            таймзона = "Europe/Kyiv"
-        elif len(частини) >= 3:
-            опис = частини[1].strip()
-            дата_час = частини[2].strip()
-            таймзона = частини[3].strip() if len(частини) >= 4 else "Europe/Kyiv"
+        опис = частини[1].strip() if len(частини) >= 3 else ""
+        дата_час = частини[2].strip() if len(частини) >= 3 else частини[1].strip()
+        таймзона = частини[3].strip() if len(частини) >= 4 else "Europe/Kyiv"
 
         dt = datetime.datetime.strptime(дата_час, "%Y-%m-%d %H:%M")
         локальна_таймзона = pytz.timezone(таймзона)
@@ -55,7 +48,6 @@ async def активність(ctx, *, args):
 
         учасники = {"👍🏻": [], "❓": [], "👎🏻": []}
         timestamp = int(час_utc.timestamp())
-
         embed = discord.Embed(title=f"📢 {назва}", color=0x00ff00)
         embed.description = f"{опис}\n\n📅 <t:{timestamp}:F> (<t:{timestamp}:R>)" if опис else f"📅 <t:{timestamp}:F> (<t:{timestamp}:R>)"
 
@@ -73,21 +65,28 @@ async def активність(ctx, *, args):
             await повідомлення.add_reaction(emoji)
 
         await asyncio.sleep(залишилось.total_seconds())
-        await повідомлення.delete()
+
+        try:
+            await повідомлення.delete()
+        except discord.NotFound:
+            pass
 
     except Exception as e:
         await ctx.send(f"⚠️ Помилка: {e}", delete_after=10)
 
 async def оновити_активність_embed(повідомлення, дані):
-    старий = повідомлення.embeds[0]
-    новий = discord.Embed(title=старий.title, description=старий.description, color=старий.color)
+    try:
+        старий = повідомлення.embeds[0]
+        новий = discord.Embed(title=старий.title, description=старий.description, color=старий.color)
+        учасники = дані["учасники"]
 
-    учасники = дані["учасники"]
-    for emoji in ["👍🏻", "❓", "👎🏻"]:
-        список = "\n".join(учасники[emoji]) if учасники[emoji] else "Ніхто"
-        новий.add_field(name=f"{emoji} ({len(учасники[emoji])})", value=список, inline=True)
+        for emoji in ["👍🏻", "❓", "👎🏻"]:
+            список = "\n".join(учасники[emoji]) if учасники[emoji] else "Ніхто"
+            новий.add_field(name=f"{emoji} ({len(учасники[emoji])})", value=список, inline=True)
 
-    await повідомлення.edit(embed=новий)
+        await повідомлення.edit(embed=новий)
+    except discord.NotFound:
+        pass
 
 @bot.command(name="твін")
 async def твін(ctx):
@@ -129,7 +128,6 @@ async def on_reaction_add(reaction, user):
     message_id = reaction.message.id
     emoji = str(reaction.emoji)
 
-    # Активність
     if message_id in reaction_data and emoji in ["👍🏻", "❓", "👎🏻"]:
         дані = reaction_data[message_id]
         учасники = дані["учасники"]
@@ -142,13 +140,11 @@ async def on_reaction_add(reaction, user):
             учасники[emoji].append(user.mention)
 
         try:
+            await оновити_активність_embed(reaction.message, дані)
             await reaction.message.remove_reaction(emoji, user)
-        except:
+        except discord.errors.HTTPException:
             pass
 
-        await оновити_активність_embed(reaction.message, дані)
-
-    # Твіни
     elif message_id in twin_data:
         twin = twin_data[message_id]
         if emoji == '🔁':
@@ -162,18 +158,16 @@ async def on_reaction_add(reaction, user):
             for ключ in twin["дані"]:
                 if user.mention in twin["дані"][ключ]:
                     twin["дані"][ключ] = ""
-
             твін = twin["emoji_map"][emoji]
             twin["дані"][твін] = user.mention
 
         текст = "\n".join([f"**{твін}** - {twin['дані'][твін]}" for твін in twin["дані"]])
         новий_embed = discord.Embed(title="🌀 Обери свого Твіна", description=текст, color=0x0099ff)
 
-        await reaction.message.edit(embed=новий_embed)
-
         try:
+            await reaction.message.edit(embed=новий_embed)
             await reaction.message.remove_reaction(emoji, user)
-        except:
+        except discord.errors.HTTPException:
             pass
 
 keep_alive()
