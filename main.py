@@ -67,18 +67,15 @@ async def twin(ctx):
     дані = {f"Твін {i+1}": None for i in range(9)}
 
     def створити_embed():
-        embed = discord.Embed(title="Вибір Твіна", color=discord.Color.blue())
         текст = "\n".join([
             f"{назва} - {дані[назва].mention if дані[назва] else ''}" for назва in дані
         ])
-        embed.description = текст
+        embed = discord.Embed(title="Вибір Твіна", description=текст, color=discord.Color.blue())
         return embed
 
     повідомлення = await ctx.send(embed=створити_embed())
 
-    for emoji in emojis:
-        await повідомлення.add_reaction(emoji)
-    for emoji in ["❌", "🔁"]:
+    for emoji in emojis + ["❌", "🔁"]:
         await повідомлення.add_reaction(emoji)
 
     bot.twin_messages[повідомлення.id] = {
@@ -94,14 +91,9 @@ async def on_raw_reaction_add(payload):
         return
 
     channel = bot.get_channel(payload.channel_id)
-    if not channel:
-        return
-
+    user = payload.member
     message_id = payload.message_id
     emoji = str(payload.emoji)
-
-    guild = channel.guild
-    user = payload.member or guild.get_member(payload.user_id)
 
     if message_id in bot.activity_messages:
         data = bot.activity_messages[message_id]
@@ -123,6 +115,7 @@ async def on_raw_reaction_add(payload):
         twin_data = bot.twin_messages[message_id]
         дані = twin_data["дані"]
         emoji_map = twin_data["emoji_map"]
+        guild = channel.guild
 
         if emoji in emoji_map:
             твін = emoji_map[emoji]
@@ -143,12 +136,11 @@ async def on_raw_reaction_add(payload):
                 дані[ключ] = None
 
             згадка_ролі = discord.utils.get(guild.roles, name=ZERO_ROLE_NAME)
-            старе_повідомлення_id = twin_data.get("ping_message_id")
-
-            if старе_повідомлення_id:
+            попереднє_id = twin_data.get("ping_message_id")
+            if попереднє_id:
                 try:
-                    старе = await channel.fetch_message(старе_повідомлення_id)
-                    await старе.delete()
+                    старе_повідомлення = await channel.fetch_message(попереднє_id)
+                    await старе_повідомлення.delete()
                 except discord.NotFound:
                     pass
 
