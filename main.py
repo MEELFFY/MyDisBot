@@ -161,4 +161,4 @@ async def on_raw_reaction_add(payload):
 keep_alive()
 
 # === УВАГА: ВСТАВ СВІЙ ТОКЕН НИЖЧЕ ===
-bot.run("TOKEN")
+bot.run(TOKEN)
