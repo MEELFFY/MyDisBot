@@ -94,9 +94,14 @@ async def on_raw_reaction_add(payload):
         return
 
     channel = bot.get_channel(payload.channel_id)
-    user = payload.member
+    if not channel:
+        return
+
     message_id = payload.message_id
     emoji = str(payload.emoji)
+
+    guild = channel.guild
+    user = payload.member or guild.get_member(payload.user_id)
 
     if message_id in bot.activity_messages:
         data = bot.activity_messages[message_id]
@@ -118,11 +123,9 @@ async def on_raw_reaction_add(payload):
         twin_data = bot.twin_messages[message_id]
         дані = twin_data["дані"]
         emoji_map = twin_data["emoji_map"]
-        guild = channel.guild
 
         if emoji in emoji_map:
             твін = emoji_map[emoji]
-            зайнятий = False
             for ключ in дані:
                 if дані[ключ] == user:
                     дані[ключ] = None
@@ -140,18 +143,18 @@ async def on_raw_reaction_add(payload):
                 дані[ключ] = None
 
             згадка_ролі = discord.utils.get(guild.roles, name=ZERO_ROLE_NAME)
-            останнє_id = twin_data.get("ping_message_id")
-            if останнє_id:
+            старе_повідомлення_id = twin_data.get("ping_message_id")
+
+            if старе_повідомлення_id:
                 try:
-                    await channel.fetch_message(останнє_id)
+                    старе = await channel.fetch_message(старе_повідомлення_id)
+                    await старе.delete()
                 except discord.NotFound:
-                    if згадка_ролі:
-                        msg = await channel.send(f"{згадка_ролі.mention} оберіть твіна", delete_after=14400)
-                        twin_data["ping_message_id"] = msg.id
-            else:
-                if згадка_ролі:
-                    msg = await channel.send(f"{згадка_ролі.mention} оберіть твіна", delete_after=14400)
-                    twin_data["ping_message_id"] = msg.id
+                    pass
+
+            if згадка_ролі:
+                нове = await channel.send(f"{згадка_ролі.mention} оберіть твіна", delete_after=14400)
+                twin_data["ping_message_id"] = нове.id
 
         embed = discord.Embed(title="Вибір Твіна", color=discord.Color.blue())
         embed.description = "\n".join([
