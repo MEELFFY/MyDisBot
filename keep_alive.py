@@ -7,5 +7,9 @@ app = Flask('')
 def home():
     return "Бот працює!"
 
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
 def keep_alive():
-    Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
+    t = Thread(target=run)
+    t.start()
