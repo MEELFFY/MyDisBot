@@ -93,10 +93,11 @@ async def on_raw_reaction_add(payload):
         return
 
     channel = bot.get_channel(payload.channel_id)
+    if channel is None:
+        return
+    user = payload.member
     message_id = payload.message_id
     emoji = str(payload.emoji)
-    guild = channel.guild
-    user = payload.member or await guild.fetch_member(payload.user_id)
 
     if message_id in bot.activity_messages:
         data = bot.activity_messages[message_id]
@@ -109,7 +110,7 @@ async def on_raw_reaction_add(payload):
         embed = data["message"].embeds[0]
         embed.clear_fields()
         for реакція in data["реакції"]:
-            учасники = ", ".join(u.mention for u in data["реакції"][реакція])
+            учасники = ", ".join(user.mention for user in data["реакції"][реакція])
             embed.add_field(name=f"{реакція} ({len(data['реакції'][реакція])})", value=учасники or "-", inline=True)
         await data["message"].edit(embed=embed)
         await data["message"].remove_reaction(payload.emoji, user)
@@ -118,6 +119,7 @@ async def on_raw_reaction_add(payload):
         twin_data = bot.twin_messages[message_id]
         дані = twin_data["дані"]
         emoji_map = twin_data["emoji_map"]
+        guild = channel.guild
 
         if emoji in emoji_map:
             твін = emoji_map[emoji]
@@ -136,16 +138,17 @@ async def on_raw_reaction_add(payload):
             for ключ in дані:
                 дані[ключ] = None
 
-            згадка_ролі = discord.utils.get(guild.roles, name=ZERO_ROLE_NAME)
-            старе_повідомлення = twin_data.get("ping_message")
-            if старе_повідомлення:
+            # Видаляємо попереднє повідомлення з пінгом
+            if twin_data["ping_message"]:
                 try:
-                    await старе_повідомлення.delete()
+                    await twin_data["ping_message"].delete()
                 except discord.NotFound:
                     pass
+
+            згадка_ролі = discord.utils.get(guild.roles, name=ZERO_ROLE_NAME)
             if згадка_ролі:
-                нове_повідомлення = await channel.send(f"{згадка_ролі.mention} оберіть твіна", delete_after=14400)
-                twin_data["ping_message"] = нове_повідомлення
+                ping_msg = await channel.send(f"{згадка_ролі.mention} оберіть твіна", delete_after=14400)
+                twin_data["ping_message"] = ping_msg
 
         embed = discord.Embed(title="Вибір Твіна", color=discord.Color.blue())
         embed.description = "\n".join([
@@ -154,8 +157,8 @@ async def on_raw_reaction_add(payload):
         await twin_data["message"].edit(embed=embed)
         await twin_data["message"].remove_reaction(payload.emoji, user)
 
-# Keep Alive для Replit
+# === Keep the bot alive on platforms like Replit ===
 keep_alive()
 
-# 🔐 Запуск бота (заміни на свій токен)
+# === УВАГА: ВСТАВ СВІЙ ТОКЕН НИЖЧЕ ===
 bot.run("YOUR_BOT_TOKEN")
