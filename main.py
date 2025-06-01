@@ -121,8 +121,8 @@ async def on_reaction_add(reaction, user):
             # Якщо твіна не зайнято, додати користувача
             if twin_data[message_id][вибраний] is None:
                 twin_data[message_id][вибраний] = user.mention
-
-await оновити_twin_embed(reaction.message, twin_data[message_id])
+            
+            await оновити_twin_embed(reaction.message, twin_data[message_id])
 
 async def оновити_embed(повідомлення, дані):
     старий = повідомлення.embeds[0]
