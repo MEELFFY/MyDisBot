@@ -1,4 +1,4 @@
-from keep_alive import keep_aliveMore actions
+from keep_alive import keep_alive actions
 import discord
 from discord.ext import commands
 import datetime
