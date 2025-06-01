@@ -1,164 +1,145 @@
 import discord
 from discord.ext import commands
 import asyncio
-import datetime
-import pytz
+from datetime import datetime
 from keep_alive import keep_alive
+
+TOKEN = "TOKEN"
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-bot.activity_messages = {}
-bot.twin_messages = {}
-
-ZERO_ROLE_NAME = "Zero Tolerance"
+twins_mention_message = None
+activity_messages = {}
 
 @bot.event
 async def on_ready():
-    print(f"Бот запущено як {bot.user}")
+    print(f"✅ Бот запущено як {bot.user}")
 
 @bot.command(name="clear")
 @commands.has_permissions(manage_messages=True)
-async def clear(ctx, amount: int = 5):
+async def clear(ctx, amount: int = 10):
     await ctx.channel.purge(limit=amount + 1)
-    await ctx.send(f"Очищено {amount} повідомлень.", delete_after=5)
+    await ctx.send(f"🧹 Очищено {amount} повідомлень.", delete_after=5)
+
+@bot.command(name="твіни")
+async def twins(ctx):
+    global twins_mention_message
+    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "❌", "🔁"]
+    twin_names = [f"Твін {i+1}" for i in range(9)]
+    twin_users = [None] * 9
+
+    embed = discord.Embed(title="Вибір твінів", color=discord.Color.green())
+    for name in twin_names:
+        embed.add_field(name=name, value="‎", inline=False)
+
+    msg = await ctx.send(embed=embed)
+    for emoji in emojis:
+        await msg.add_reaction(emoji)
+
+    if twins_mention_message:
+        try:
+            await twins_mention_message.delete()
+        except:
+            pass
+    twins_mention_message = await ctx.send("@Zero Tolerance оберіть твіна")
+    await asyncio.sleep(14400)
+    await twins_mention_message.delete()
+
+    def check(reaction, user):
+        return user != bot.user and reaction.message.id == msg.id
+
+    while True:
+        try:
+            reaction, user = await bot.wait_for("reaction_add", timeout=14400.0, check=check)
+            emoji = reaction.emoji
+
+            if emoji in emojis[:9]:
+                idx = emojis.index(emoji)
+                if twin_users[idx] and twin_users[idx] != user:
+                    await msg.remove_reaction(reaction, user)
+                    continue
+
+                for i, u in enumerate(twin_users):
+                    if u == user:
+                        twin_users[i] = None
+                        await msg.remove_reaction(emojis[i], user)
+
+                twin_users[idx] = user
+
+            elif emoji == "❌":
+                for i, u in enumerate(twin_users):
+                    if u == user:
+                        twin_users[i] = None
+                        await msg.remove_reaction(emojis[i], user)
+
+            elif emoji == "🔁":
+                if twins_mention_message:
+                    try:
+                        await twins_mention_message.delete()
+                    except:
+                        pass
+                twins_mention_message = await ctx.send("@Zero Tolerance оберіть твіна (оновлено)")
+                await asyncio.sleep(14400)
+                await twins_mention_message.delete()
+                twin_users = [None] * 9
+                for emoji in emojis[:9]:
+                    await msg.clear_reaction(emoji)
+                    await msg.add_reaction(emoji)
+
+            new_embed = discord.Embed(title="Вибір твінів", color=discord.Color.green())
+            for i, name in enumerate(twin_names):
+                if twin_users[i]:
+                    new_embed.add_field(name=name, value=twin_users[i].mention, inline=False)
+                else:
+                    new_embed.add_field(name=name, value="‎", inline=False)
+            await msg.edit(embed=new_embed)
+
+        except asyncio.TimeoutError:
+            break
 
 @bot.command(name="активність")
-async def активність(ctx, *, дані):
+async def activity(ctx, *, content):
     try:
-        назва, опис, дата = [частина.strip() for частина in дані.split("|")]
+        title, description, time_str = map(str.strip, content.split("|"))
+        event_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M")
+        timestamp = int(event_time.timestamp())
+
+        embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
+        embed.add_field(name="Час", value=f"<t:{timestamp}:F> (<t:{timestamp}:R>)", inline=False)
+        embed.add_field(name="👍🏻", value="‎", inline=True)
+        embed.add_field(name="❓", value="‎", inline=True)
+        embed.add_field(name="👎🏻", value="‎", inline=True)
+
+        msg = await ctx.send(embed=embed)
+        await msg.add_reaction("👍🏻")
+        await msg.add_reaction("❓")
+        await msg.add_reaction("👎🏻")
+        mention_msg = await ctx.send("@Zero Tolerance подія створена")
+
+        participants = {"👍🏻": [], "❓": [], "👎🏻": []}
+
+        def check(reaction, user):
+            return user != bot.user and reaction.message.id == msg.id
+
+        while True:
+            reaction, user = await bot.wait_for("reaction_add", timeout=7200, check=check)
+            for emoji in participants:
+                if user in participants[emoji]:
+                    participants[emoji].remove(user)
+            if str(reaction.emoji) in participants:
+                participants[str(reaction.emoji)].append(user)
+
+            new_embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
+            new_embed.add_field(name="Час", value=f"<t:{timestamp}:F> (<t:{timestamp}:R>)", inline=False)
+            for emoji in ["👍🏻", "❓", "👎🏻"]:
+                users = participants[emoji]
+                names = ", ".join(user.mention for user in users) if users else "‎"
+                new_embed.add_field(name=emoji, value=names, inline=True)
+            await msg.edit(embed=new_embed)
+
     except ValueError:
-        await ctx.send("❌ Неправильний формат. Використай: `!активність Назва | Опис | Дата`")
-        return
+        await ctx.send("⚠️ Формат: `!активність Назва | Опис | 2025-06-02 18:00`")
 
-    try:
-        дата_обʼєкт = datetime.datetime.strptime(дата, "%d.%m.%Y %H:%M")
-        дата_обʼєкт = pytz.timezone("Europe/Kyiv").localize(дата_обʼєкт)
-        timestamp = int(дата_обʼєкт.timestamp())
-    except ValueError:
-        await ctx.send("❌ Неправильний формат дати. Використай: `дд.мм.рррр гг:хх`")
-        return
-
-    згадка_ролі = discord.utils.get(ctx.guild.roles, name=ZERO_ROLE_NAME)
-    згадка_текст = f"{згадка_ролі.mention} " if згадка_ролі else ""
-
-    embed = discord.Embed(title=назва, description=опис, color=discord.Color.green())
-    embed.add_field(name="Час", value=f"<t:{timestamp}:F> (<t:{timestamp}:R>)", inline=False)
-    embed.set_footer(text="Оберіть реакцію:")
-    message = await ctx.send(f"{згадка_текст}", embed=embed)
-
-    for emoji in ["👍🏻", "❓", "👎🏻"]:
-        await message.add_reaction(emoji)
-
-    bot.activity_messages[message.id] = {
-        "message": message,
-        "реакції": {
-            "👍🏻": [],
-            "❓": [],
-            "👎🏻": []
-        }
-    }
-
-    await asyncio.sleep(10)
-    await message.delete()
-
-@bot.command(name="твін")
-async def twin(ctx):
-    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
-    дані = {f"Твін {i+1}": None for i in range(9)}
-
-    def створити_embed():
-        embed = discord.Embed(title="Вибір Твіна", color=discord.Color.blue())
-        текст = "\n".join([
-            f"{назва} - {дані[назва].mention if дані[назва] else ''}" for назва in дані
-        ])
-        embed.description = текст
-        return embed
-
-    повідомлення = await ctx.send(embed=створити_embed())
-
-    for emoji in emojis + ["❌", "🔁"]:
-        await повідомлення.add_reaction(emoji)
-
-    bot.twin_messages[повідомлення.id] = {
-        "message": повідомлення,
-        "дані": дані,
-        "emoji_map": {emoji: f"Твін {i+1}" for i, emoji in enumerate(emojis)},
-        "ping_message": None
-    }
-
-@bot.event
-async def on_raw_reaction_add(payload):
-    if payload.user_id == bot.user.id:
-        return
-
-    channel = bot.get_channel(payload.channel_id)
-    if channel is None:
-        return
-    user = payload.member
-    message_id = payload.message_id
-    emoji = str(payload.emoji)
-
-    if message_id in bot.activity_messages:
-        data = bot.activity_messages[message_id]
-        for реакція in data["реакції"]:
-            if user in data["реакції"][реакція]:
-                data["реакції"][реакція].remove(user)
-        if emoji in data["реакції"]:
-            data["реакції"][emoji].append(user)
-
-        embed = data["message"].embeds[0]
-        embed.clear_fields()
-        for реакція in data["реакції"]:
-            учасники = ", ".join(user.mention for user in data["реакції"][реакція])
-            embed.add_field(name=f"{реакція} ({len(data['реакції'][реакція])})", value=учасники or "-", inline=True)
-        await data["message"].edit(embed=embed)
-        await data["message"].remove_reaction(payload.emoji, user)
-
-    elif message_id in bot.twin_messages:
-        twin_data = bot.twin_messages[message_id]
-        дані = twin_data["дані"]
-        emoji_map = twin_data["emoji_map"]
-        guild = channel.guild
-
-        if emoji in emoji_map:
-            твін = emoji_map[emoji]
-            for ключ in дані:
-                if дані[ключ] == user:
-                    дані[ключ] = None
-            if дані[твін] is None:
-                дані[твін] = user
-
-        elif emoji == "❌":
-            for ключ in дані:
-                if дані[ключ] == user:
-                    дані[ключ] = None
-
-        elif emoji == "🔁":
-            for ключ in дані:
-                дані[ключ] = None
-
-            # Видаляємо попереднє повідомлення з пінгом
-            if twin_data["ping_message"]:
-                try:
-                    await twin_data["ping_message"].delete()
-                except discord.NotFound:
-                    pass
-
-            згадка_ролі = discord.utils.get(guild.roles, name=ZERO_ROLE_NAME)
-            if згадка_ролі:
-                ping_msg = await channel.send(f"{згадка_ролі.mention} оберіть твіна", delete_after=14400)
-                twin_data["ping_message"] = ping_msg
-
-        embed = discord.Embed(title="Вибір Твіна", color=discord.Color.blue())
-        embed.description = "\n".join([
-            f"{назва} - {учасник.mention if учасник else ''}" for назва, учасник in дані.items()
-        ])
-        await twin_data["message"].edit(embed=embed)
-        await twin_data["message"].remove_reaction(payload.emoji, user)
-
-# === Keep the bot alive on platforms like Replit ===
 keep_alive()
-
-# === УВАГА: ВСТАВ СВІЙ ТОКЕН НИЖЧЕ ===
 bot.run(TOKEN)
