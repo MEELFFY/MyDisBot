@@ -67,10 +67,11 @@ async def twin(ctx):
     дані = {f"Твін {i+1}": None for i in range(9)}
 
     def створити_embed():
+        embed = discord.Embed(title="Вибір Твіна", color=discord.Color.blue())
         текст = "\n".join([
             f"{назва} - {дані[назва].mention if дані[назва] else ''}" for назва in дані
         ])
-        embed = discord.Embed(title="Вибір Твіна", description=текст, color=discord.Color.blue())
+        embed.description = текст
         return embed
 
     повідомлення = await ctx.send(embed=створити_embed())
@@ -95,6 +96,7 @@ async def on_raw_reaction_add(payload):
     message_id = payload.message_id
     emoji = str(payload.emoji)
 
+    # ===== Активність =====
     if message_id in bot.activity_messages:
         data = bot.activity_messages[message_id]
         for реакція in data["реакції"]:
@@ -111,6 +113,7 @@ async def on_raw_reaction_add(payload):
         await data["message"].edit(embed=embed)
         await data["message"].remove_reaction(payload.emoji, user)
 
+    # ===== Твін =====
     elif message_id in bot.twin_messages:
         twin_data = bot.twin_messages[message_id]
         дані = twin_data["дані"]
@@ -122,9 +125,8 @@ async def on_raw_reaction_add(payload):
             for ключ in дані:
                 if дані[ключ] == user:
                     дані[ключ] = None
-            if not any(user == учасник for учасник in дані.values()):
-                if дані[твін] is None:
-                    дані[твін] = user
+            if дані[твін] is None:
+                дані[твін] = user
 
         elif emoji == "❌":
             for ключ in дані:
@@ -136,17 +138,18 @@ async def on_raw_reaction_add(payload):
                 дані[ключ] = None
 
             згадка_ролі = discord.utils.get(guild.roles, name=ZERO_ROLE_NAME)
-            попереднє_id = twin_data.get("ping_message_id")
-            if попереднє_id:
+            старе_повідомлення_id = twin_data.get("ping_message_id")
+
+            if старе_повідомлення_id:
                 try:
-                    старе_повідомлення = await channel.fetch_message(попереднє_id)
+                    старе_повідомлення = await channel.fetch_message(старе_повідомлення_id)
                     await старе_повідомлення.delete()
                 except discord.NotFound:
                     pass
 
             if згадка_ролі:
-                нове = await channel.send(f"{згадка_ролі.mention} оберіть твіна", delete_after=14400)
-                twin_data["ping_message_id"] = нове.id
+                msg = await channel.send(f"{згадка_ролі.mention} оберіть твіна", delete_after=14400)
+                twin_data["ping_message_id"] = msg.id
 
         embed = discord.Embed(title="Вибір Твіна", color=discord.Color.blue())
         embed.description = "\n".join([
@@ -155,4 +158,5 @@ async def on_raw_reaction_add(payload):
         await twin_data["message"].edit(embed=embed)
         await twin_data["message"].remove_reaction(payload.emoji, user)
 
+# 🚨 Заміни "YOUR_BOT_TOKEN" на свій реальний токен
 bot.run("YOUR_BOT_TOKEN")
