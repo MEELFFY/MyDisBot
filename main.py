@@ -142,4 +142,4 @@ async def activity(ctx, *, content):
         await ctx.send("⚠️ Формат: `!активність Назва | Опис | 2025-06-02 18:00`")
 
 keep_alive()
-bot.run(TOKEN)
+bot.run("TOKEN")
