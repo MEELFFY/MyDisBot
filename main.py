@@ -2,7 +2,7 @@ from keep_alive import keep_alive
 import discord
 from discord.ext import commands
 import datetime
-import pytzMore actions
+import pytz
 import asyncio
 import os
 
@@ -24,18 +24,15 @@ async def активність(ctx, *, args):
         await ctx.message.delete()
 
         частини = args.split("|")
-
         if len(частини) < 2:
             await ctx.send("❌ Формат:\nЗ описом: `!активність Назва | Опис | Дата`\nБез опису: `!активність Назва | Дата`", delete_after=10)
             return
 
         назва = частини[0].strip()
-
         if len(частини) == 2:
             опис = ""
             дата_час = частини[1].strip()
         else:
-
             опис = частини[1].strip()
             дата_час = частини[2].strip()
 
@@ -52,7 +49,6 @@ async def активність(ctx, *, args):
             return
 
         учасники = {"👍🏻": [], "❓": [], "👎🏻": []}
-
         timestamp = int(час_utc.timestamp())
 
         embed = discord.Embed(title=f"📢 {назва}", color=0x00ff00)
@@ -93,7 +89,6 @@ async def твін(ctx):
     твіни = [f"Твін {i}" for i in range(1, 10)]
     emojis = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣']
     emoji_map = dict(zip(emojis, твіни))
-
     дані = {твін: None for твін in твіни}
 
     embed = discord.Embed(title="🌀 Обери свого Твіна", color=0x0099ff)
@@ -102,7 +97,6 @@ async def твін(ctx):
         embed.add_field(name="\u200b", value=f"**{твін}** - {учасник or ''}", inline=False)
 
     повідомлення = await ctx.send(embed=embed)
-
     bot.twin_messages = getattr(bot, "twin_messages", {})
     bot.twin_messages[повідомлення.id] = {"message": повідомлення, "дані": дані, "emoji_map": emoji_map}
 
@@ -122,7 +116,6 @@ async def on_reaction_add(reaction, user):
     message_id = reaction.message.id
     emoji = str(reaction.emoji)
 
-    # --- Обробка активностей ---
     if message_id in reaction_data and emoji in ["👍🏻", "❓", "👎🏻"]:
         дані = reaction_data[message_id]
         учасники = дані["учасники"]
@@ -133,7 +126,6 @@ async def on_reaction_add(reaction, user):
 
         учасники[emoji].append(user.mention)
 
-
         try:
             await reaction.message.remove_reaction(emoji, user)
         except:
@@ -142,28 +134,20 @@ async def on_reaction_add(reaction, user):
         await оновити_embed(reaction.message, дані)
         return
 
-    # --- Обробка Твінів ---
     if hasattr(bot, "twin_messages") and message_id in bot.twin_messages:
         twin_data = bot.twin_messages[message_id]
-
         дані = twin_data["дані"]
         emoji_map = twin_data["emoji_map"]
-
 
         if emoji == '🔁':
             for ключ in дані:
                 дані[ключ] = None
-
-
         elif emoji == '❌':
             for ключ in дані:
                 if дані[ключ] == user.mention:
                     дані[ключ] = None
-
-
         elif emoji in emoji_map:
             вибраний = emoji_map[emoji]
-            # Видаляємо учасника з усіх твинів
             for ключ in дані:
                 if дані[ключ] == user.mention:
                     дані[ключ] = None
@@ -177,10 +161,12 @@ async def on_reaction_add(reaction, user):
         await reaction.message.edit(embed=новий_embed)
 
         try:
-
             await reaction.message.remove_reaction(emoji, user)
         except:
             pass
 
+# Підтримка безперервної роботи
 keep_alive()
-bot.run(os.getenv("DISCORD_TOKEN"))
+
+# 🔒 Запуск з середовища — тільки TOKEN!
+bot.run(os.getenv("TOKEN"))
